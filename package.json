@@ -1,0 +1,17 @@
+{
+  "name": "anode_zed",
+  "version": "0.0.1",
+  "description": "node bindings for stereolabs zed camera",
+  "main": "index.js",
+  "scripts": {
+    "install": "node-gyp rebuild",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "Artificial Nature / Graham Wakefield / Alice Lab",
+  "license": "MIT",
+  "gypfile": true,
+  "dependencies": {
+    "bindings": "^1.5.0",
+    "node-addon-api": "^7.0.0"
+  }
+}
