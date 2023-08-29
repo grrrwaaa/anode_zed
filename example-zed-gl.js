@@ -1,4 +1,4 @@
-const zed = require('bindings')('zed.node');
+const zed = require('./zed.js')
 
 const assert = require("assert"),
 	fs = require("fs"),
