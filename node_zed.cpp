@@ -63,22 +63,43 @@ struct Camera : public Napi::ObjectWrap<Camera> {
 		const Napi::Object options = info.Length() ? info[0].ToObject() : Napi::Object::New(env);
 
 		// TODO configure from options:
+		// https://www.stereolabs.com/docs/api/structsl_1_1InitParameters.html
 		sl::InitParameters init_parameters;
-		init_parameters.sdk_verbose = true; // Enable verbose logging
-		init_parameters.depth_mode = sl::DEPTH_MODE::PERFORMANCE; // PERFORMANCE, QUALITY, or ULTRA
 		init_parameters.camera_resolution = sl::RESOLUTION::HD720;
 		init_parameters.camera_fps = 30;
+		init_parameters.depth_mode = sl::DEPTH_MODE::NEURAL; // PERFORMANCE, QUALITY, ULTRA, or NEURAL
 		init_parameters.coordinate_units = sl::UNIT::METER;
+		init_parameters.depth_minimum_distance = 0.3;
+		init_parameters.depth_maximum_distance = 8.0;
+		init_parameters.depth_stabilization = 50; // 50%
+		init_parameters.coordinate_system = sl::COORDINATE_SYSTEM::RIGHT_HANDED_Y_UP;
+		//init_parameters.sdk_verbose = true; // Enable verbose logging
+		init_parameters.async_grab_camera_recovery = true;
+		// int 	camera_image_flip
+		// bool 	camera_disable_self_calib
+		// bool 	enable_right_side_measure
+		// bool 	svo_real_time_mode
+		// CUdevice 	sdk_gpu_id
+		// int 	sdk_verbose
+		// String 	sdk_verbose_log_file
+		// CUcontext 	sdk_cuda_ctx
+		// InputType 	input
+		// String 	optional_settings_path
+		// String 	optional_opencv_calibration_file
+		// bool 	sensors_required
+		// bool 	enable_image_enhancement
+		// float 	open_timeout_sec
+		// bool 	async_grab_camera_recovery
+		// float 	grab_compute_capping_fps
 
 		//https://www.stereolabs.com/docs/depth-sensing/depth-settings/
 		//https://www.stereolabs.com/docs/api/structsl_1_1RuntimeParameters.html#a97bb28af0c7ce0abacd621910cae8c44
 		// REFERENCE_FRAME 	measure3D_reference_frame
-		// bool 	enable_depth
-		// bool 	enable_fill_mode = false
-		// int 	confidence_threshold = 100
-		// int 	texture_confidence_threshold = 100
-		// bool 	remove_saturated_areas = true
-		runtime_parameters.enable_fill_mode = true;
+		runtime_parameters.enable_depth = true;
+		runtime_parameters.confidence_threshold = 5;
+		runtime_parameters.texture_confidence_threshold = 95;
+		runtime_parameters.remove_saturated_areas = true;
+		runtime_parameters.enable_fill_mode = false;	
 		
 		// from SVO file:
 		//init_parameters.input.setFromSVOFile(input_path);
@@ -199,6 +220,13 @@ struct Camera : public Napi::ObjectWrap<Camera> {
 		if (err == sl::ERROR_CODE::END_OF_SVOFILE_REACHED) zed.setSVOPosition(0);
 		if (err != sl::ERROR_CODE::SUCCESS) return info.Env().Null();
 
+		
+		if (info.Length()) {
+			const Napi::Object options = info[0].ToObject();
+			// modify runtime_parameters here
+		}
+
+		
 		// Extract multi-sensor data
 		zed.getSensorsData(sensors_data, sl::TIME_REFERENCE::IMAGE); // Get frame synchronized sensor data
 		// auto imu_data = sensors_data.imu;
