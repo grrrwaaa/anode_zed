@@ -46,8 +46,21 @@ const points_vao = glutils.createVao(gl, {
     vertexComponents: 4,
     vertices: cam.cloud,
     normals: cam.normals,
+    // colors:
     texCoords: new Float32Array(cam.width * cam.height * 2)
 })
+// add a buffer for the colors:
+{
+    points_vao.bind()
+    // normalize 0
+    // bytestride = 4 x float32 = 16
+    // byteoffset = 3 x float32 = 12
+    gl.enableVertexAttribArray(3);
+    gl.bindBuffer(gl.ARRAY_BUFFER, points_vao.vertexBuffer);
+    gl.vertexAttribPointer(3, 4, gl.UNSIGNED_BYTE, 1, 16, 12);
+    points_vao.unbind()
+}
+
 points_vao.geom.texCoords.forEach((v, i, a) => {
     let idx = Math.floor(i/2)
     let y = Math.floor(idx / cam.width) / cam.height
@@ -55,8 +68,24 @@ points_vao.geom.texCoords.forEach((v, i, a) => {
     a[i] = (i % 2) ? y : x;
 })
 
+function info(c, r) {
+	const { width, height, cloud, normals } = cam
+	let idx = 4 * (c + r*width)
+
+	// get centre pixel:
+	let pos = cloud.subarray(idx, idx+3)
+	let normal = normals.subarray(idx, idx+3)
+	let rgba = new Uint8Array(cloud.buffer, (idx+3)*4, 4)
+	console.log(c, r, pos, normal, rgba)
+}
+
 window.draw = function() {
 	let { t, dt } = this;
+
+    // const { width, height, cloud, normals } = cam
+	// let c = Math.floor(width/2)
+	// let r = Math.floor(height/2)
+	// info(c, r)
 
 	let viewmatrix = mat4.create();
 	let projmatrix = mat4.create();
@@ -73,8 +102,12 @@ window.draw = function() {
     }
     
     let dim = glfw.getFramebufferSize(this.window)
-    mat4.perspective(projmatrix, Math.PI * 0.4, dim[0] / dim[1], 0.3, 10)
-    mat4.lookAt(viewmatrix, [0, 0, 1], [0, 0, 0], [0, 1, 0])
+    mat4.perspective(projmatrix, Math.PI * 0.5, dim[0] / dim[1], 0.3, 10)
+    let a = t
+    let at = [0, 0, -3]
+    let eye = [at[0] + Math.sin(a), at[1], at[2] + Math.cos(a)]
+
+    mat4.lookAt(viewmatrix, eye, at, [0, 1, 0])
 
     gl.viewport(0, 0, dim[0], dim[1]);
 	gl.clearColor(0, 0, 0, 1);

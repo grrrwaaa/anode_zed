@@ -1,4 +1,4 @@
-const zed = require('bindings')('zed.node');
+const zed = require('./zed.js')
 console.log("Devices", zed.devices)
 let cam = new zed.Camera().open()
 console.log("cam", cam)

@@ -6,12 +6,14 @@ uniform mat4 u_modelmatrix;
 uniform sampler2D u_tex_normals;
 uniform sampler2D u_tex_cloud;
 
-layout(location = 0) in vec3 a_position;
+layout(location = 0) in vec4 a_position;
 layout(location = 1) in vec3 a_normal;
 layout(location = 2) in vec2 a_texCoord;
+layout(location = 3) in vec4 a_color;
 out vec2 v_uv;
 out vec3 v_normal;
 out vec4 v_color;
+out vec4 v_pos;
 
 void main() {
 	v_uv = a_texCoord;
@@ -25,6 +27,7 @@ void main() {
 
     v_normal = a_normal;
 
-    v_color = texture(u_tex_cloud, v_uv);
+    v_color = a_color.rgba; //texture(u_tex_cloud, v_uv);
     v_normal = texture(u_tex_normals, v_uv).xyz;
+    v_pos = a_position;
 }
