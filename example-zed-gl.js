@@ -58,6 +58,10 @@ const points_vao = glutils.createVao(gl, {
     gl.enableVertexAttribArray(3);
     gl.bindBuffer(gl.ARRAY_BUFFER, points_vao.vertexBuffer);
     gl.vertexAttribPointer(3, 4, gl.UNSIGNED_BYTE, 1, 16, 12);
+
+    // also fix up normals, because they use a stride of 4 floats, not 3:
+    gl.bindBuffer(gl.ARRAY_BUFFER, points_vao.normalBuffer);
+    gl.vertexAttribPointer(1, 3, gl.FLOAT, 0, 16, 0);
     points_vao.unbind()
 }
 
@@ -79,6 +83,11 @@ function info(c, r) {
 	console.log(c, r, pos, normal, rgba)
 }
 
+
+let camera_height = 1;
+let axisy = [0, 1, 0] // some basic default
+let modelmatrix_cam = mat4.create();
+
 window.draw = function() {
 	let { t, dt } = this;
 
@@ -86,6 +95,7 @@ window.draw = function() {
 	// let c = Math.floor(width/2)
 	// let r = Math.floor(height/2)
 	// info(c, r)
+
 
 	let viewmatrix = mat4.create();
 	let projmatrix = mat4.create();
@@ -98,45 +108,80 @@ window.draw = function() {
         // confidence 0-5%
         // texture confidence 95%
         cam.grab()
-        const { width, height, cloud, normals } = cam
+
+        //
+
+        cloudtex.data = cam.cloud
+        cloudtex.bind(1).submit()
+    
+        normaltex.data = cam.normals
+        normaltex.bind(0).submit()
+        
+        //console.log(cam.acceleration)
+        let a = vec3.clone(cam.acceleration)
+        vec3.normalize(a, a)
+        vec3.lerp(axisy, axisy, a, 0.1)
+        vec3.normalize(axisy, axisy)
+
+        let axisz = vec3.cross(vec3.create(), axisy, [axisy[2], axisy[0], axisy[1]])
+        vec3.normalize(axisz, axisz)
+        let axisx = vec3.cross(vec3.create(), axisy, axisz)
+        vec3.normalize(axisz, axisz)
+
+    
+        mat4.set(modelmatrix_cam, 
+            axisx[0], axisy[0], axisz[0], 0.,
+            axisx[1], axisy[1], axisz[1], 0.,
+            axisx[2], axisy[2], axisz[2], 0.,
+            0, camera_height, 0, 1);
     }
     
     let dim = glfw.getFramebufferSize(this.window)
-    mat4.perspective(projmatrix, Math.PI * 0.5, dim[0] / dim[1], 0.3, 10)
+    let near = 0.3, far = 10, aspect = dim[0]/dim[1]
+    let fov = 1
+    let y = camera_height
+    mat4.frustum(projmatrix, 
+        -aspect*near*fov, aspect*near*fov, 
+        near*(y-fov), near*(y+fov), 
+        near, far)
+    //mat4.perspective(projmatrix, Math.PI * 0.5, dim[0] / dim[1], near, far)
     let a = t
     let at = [0, 0, -3]
     let eye = [at[0] + Math.sin(a), at[1], at[2] + Math.cos(a)]
-
     mat4.lookAt(viewmatrix, eye, at, [0, 1, 0])
+    
 
     gl.viewport(0, 0, dim[0], dim[1]);
 	gl.clearColor(0, 0, 0, 1);
 	gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 
-    cloudtex.data = cam.cloud
-    cloudtex.bind(1).submit()
+    gl.enable(gl.BLEND);
+	gl.blendFunc(gl.SRC_ALPHA, gl.ONE);
+	gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+    //gl.blendEquation(gl.FUNC_ADD)
+    gl.blendEquation(gl.MAX)
 
-    normaltex.data = cam.normals
-    normaltex.bind(0).submit()
+    gl.disable(gl.DEPTH_TEST)
+    gl.depthMask(false)
 
     if (0) {
-
         shaderman.shaders.normals.begin()
         .uniform("u_tex_normals", 0)
         .uniform("u_tex_cloud", 1)
         quad_vao.bind().draw()
     } else {
         shaderman.shaders.points.begin()
-        .uniform("u_tex_normals", 0)
-        .uniform("u_tex_cloud", 1)
-        .uniform("u_modelmatrix", modelmatrix)
+        .uniform("u_modelmatrix", modelmatrix_cam)
         .uniform("u_viewmatrix", viewmatrix)
         .uniform("u_projmatrix", projmatrix)
-        // quad_vao.bind().draw()
-
+        .uniform("u_pointsize", dim[0]/200)
+        .uniform("u_showmode", Math.floor(t) % 2)
         points_vao.bind().submit().drawPoints()
     }
 
+    gl.disable(gl.BLEND);
+    gl.enable(gl.DEPTH_TEST)
+    gl.depthMask(true)
     //console.log(1/dt)
 }
 

@@ -46,6 +46,8 @@ struct Camera : public Napi::ObjectWrap<Camera> {
 	// The output is a 4 channels 32-bit matrix (X,Y,Z,empty), where X,Y,Z values encode the direction of the normal vectors.
 	sl::Mat normals;
 
+	sl::float3 acceleration;
+
 	//sl::Mat confidence_map;
 	sl::Resolution capture_res;
 	uint64_t ms = 0;
@@ -179,6 +181,13 @@ struct Camera : public Napi::ObjectWrap<Camera> {
 			napi_float32_array)
 		);
 
+		This.Set("acceleration", Napi::TypedArrayOf<float>::New(env, 
+			3,
+			Napi::ArrayBuffer::New(env, &acceleration.x, 3 * 4),
+			0,
+			napi_float32_array)
+		);
+
 		//confidence_map.alloc(capture_res, sl::MAT_TYPE::8U_C4);
 		// This.Set("confidence", Napi::TypedArrayOf<uint8_t>::New(env, 
 		// 	4 * capture_res.width * capture_res.height,
@@ -220,21 +229,35 @@ struct Camera : public Napi::ObjectWrap<Camera> {
 		if (err == sl::ERROR_CODE::END_OF_SVOFILE_REACHED) zed.setSVOPosition(0);
 		if (err != sl::ERROR_CODE::SUCCESS) return info.Env().Null();
 
+		Napi::Object This = info.This().As<Napi::Object>();
 		
 		if (info.Length()) {
 			const Napi::Object options = info[0].ToObject();
 			// modify runtime_parameters here
+			
+
+			//https://www.stereolabs.com/docs/depth-sensing/depth-settings/
+			//https://www.stereolabs.com/docs/api/structsl_1_1RuntimeParameters.html#a97bb28af0c7ce0abacd621910cae8c44
+			// REFERENCE_FRAME 	measure3D_reference_frame
+			runtime_parameters.enable_depth = true;
+			runtime_parameters.confidence_threshold = 5;
+			runtime_parameters.texture_confidence_threshold = 95;
+			runtime_parameters.remove_saturated_areas = true;
+			runtime_parameters.enable_fill_mode = false;	
 		}
 
 		
 		// Extract multi-sensor data
 		zed.getSensorsData(sensors_data, sl::TIME_REFERENCE::IMAGE); // Get frame synchronized sensor data
-		// auto imu_data = sensors_data.imu;
+		acceleration = sensors_data.imu.linear_acceleration;
+
+		//This.Set("acceleration", )
+
+		//sl::float3 angular_velocity = imu_data.angular_velocity;
 		// auto barometer_data = sensors_data.barometer;
 		// auto magnetometer_data = sensors_data.magnetometer;
 		// Retrieve linear acceleration and angular velocity
-		//sl::float3 linear_acceleration = imu_data.linear_acceleration;
-		//sl::float3 angular_velocity = imu_data.angular_velocity;
+		
 		// Retrieve pressure and relative altitude
 		// float pressure = barometer_data.pressure;
 		// float relative_altitude = barometer_data.relative_altitude;
