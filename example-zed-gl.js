@@ -6,6 +6,12 @@ const assert = require("assert"),
 
 const { vec2, vec3, vec4, quat, mat2, mat2d, mat3, mat4} = require("gl-matrix")
 
+//2.8mm pitch
+const options = {
+    run: true,
+    tex: 0
+}
+
 // add anode_gl to the module search paths:
 module.paths.push(path.resolve(path.join(__dirname, "..", "anode_gl")))
 
@@ -85,8 +91,10 @@ function info(c, r) {
 
 
 let camera_height = 1;
+let camera_distance = 1;
 let axisy = [0, 1, 0] // some basic default
 let modelmatrix_cam = mat4.create();
+let camera_rotation = 0
 
 window.draw = function() {
 	let { t, dt } = this;
@@ -139,15 +147,15 @@ window.draw = function() {
     let dim = glfw.getFramebufferSize(this.window)
     let near = 0.3, far = 10, aspect = dim[0]/dim[1]
     let fov = 1
-    let y = camera_height
+    let y = 0 //camera_height
     mat4.frustum(projmatrix, 
         -aspect*near*fov, aspect*near*fov, 
         near*(y-fov), near*(y+fov), 
         near, far)
     //mat4.perspective(projmatrix, Math.PI * 0.5, dim[0] / dim[1], near, far)
-    let a = t
-    let at = [0, 0, -3]
-    let eye = [at[0] + Math.sin(a), at[1], at[2] + Math.cos(a)]
+    //if (options.run) camera_rotation += dt;
+    let at = [0, y+1, -camera_distance]
+    let eye = [at[0] + Math.sin(camera_rotation), at[1], at[2] + Math.cos(camera_rotation)]
     mat4.lookAt(viewmatrix, eye, at, [0, 1, 0])
     
 
@@ -175,7 +183,7 @@ window.draw = function() {
         .uniform("u_viewmatrix", viewmatrix)
         .uniform("u_projmatrix", projmatrix)
         .uniform("u_pointsize", dim[0]/200)
-        .uniform("u_showmode", Math.floor(t) % 2)
+        .uniform("u_showmode", options.tex ? 1 : 0)
         points_vao.bind().submit().drawPoints()
     }
 
@@ -183,6 +191,40 @@ window.draw = function() {
     gl.enable(gl.DEPTH_TEST)
     gl.depthMask(true)
     //console.log(1/dt)
+}
+
+const mouse = {
+    down: 0,
+    pos: [0, 0]
+}
+
+window.onpointerbutton = function(button, action, mods) {
+    console.log(button, action, mods)
+    mouse.down = action;
+}
+
+window.onpointermove = function(x, y) {
+    mouse.pos = [x, y]
+    if (mouse.down) {
+        camera_rotation = x*Math.PI
+        camera_distance = y*4
+    }
+}
+
+window.onkey = function(key, scan, down, mod) {
+    if (down) {
+        switch(key) {
+            case 32: {
+                options.run = !options.run;
+            } break;
+            
+            case 84: {
+                options.tex = !options.tex;
+            } break;
+            default: console.log(key, scan, down, mod);
+        }
+        
+    }
 }
 
 Window.animate()
