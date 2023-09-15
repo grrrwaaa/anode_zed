@@ -12,13 +12,17 @@ const options = {
     tex: 1
 }
 
+// what we want here is an orthographic projection, whose dimensions match the screen (in meters)
+// and the view is oriented such that Y is up from ground level, Z is out from the screen, and X is on the plane of the screen
+
+// set the height of the screen in meters (this defines the height in meters of data that will be rendered)
+let ortho_height_m = 2
 // the view will be oriented to the screen
 // near & far set the effective minimum and maximum distance from the screen (in meters) that data is rendered:
-let near = 0.3, far = 10 
+let near = 0, far = 5 
 // the camera position relative to the screen
 // (x position along screen width, y up from screen base, z meters in front of the screen)
 let camera_pos = [0, 1.5, 0]
-let camera_distance = 1;
 let camera_rotation = 0
 
 // add anode_gl to the module search paths:
@@ -29,8 +33,6 @@ const gl = require('gles3.js'),
     Window = require("window.js"),
 	glutils = require('glutils.js'),
 	Shaderman = require('shaderman.js')
-
-
 
 console.log("Devices", zed.devices)
 
@@ -47,6 +49,7 @@ let window = new Window({
 const shaderman = new Shaderman(gl)
 shaderman.create(gl, "normals")
 shaderman.create(gl, "points")
+shaderman.create(gl, "points_depth")
 
 const quad_vao = glutils.createVao(gl, glutils.makeQuad())
 
@@ -100,6 +103,8 @@ function info(c, r) {
 	console.log(c, r, pos, normal, rgba)
 }
 
+
+
 let axisy = [0, 1, 0] // some basic default
 let modelmatrix_cam = mat4.create();
 
@@ -110,6 +115,8 @@ window.draw = function() {
 	// let c = Math.floor(width/2)
 	// let r = Math.floor(height/2)
 	// info(c, r)
+
+    //camera_rotation = t
 
 
 	let viewmatrix = mat4.create();
@@ -124,14 +131,12 @@ window.draw = function() {
         // texture confidence 95%
         cam.grab()
 
-        //
-
+        // send to GPU
         cloudtex.data = cam.cloud
         cloudtex.bind(1).submit()
-    
         normaltex.data = cam.normals
         normaltex.bind(0).submit()
-        
+
         if (t < 10) {
             // in the first 10 seconds, use accelerometer data to adjust our orientation
         
@@ -163,53 +168,46 @@ window.draw = function() {
             // now generate our camera's modelmatrix
             mat4.identity(modelmatrix_cam)
             mat4.translate(modelmatrix_cam, modelmatrix_cam, camera_pos)
-            //mat4.rotateY(modelmatrix_cam, modelmatrix_cam, camera_rotation)
+            mat4.rotateY(modelmatrix_cam, modelmatrix_cam, camera_rotation)
             mat4.multiply(modelmatrix_cam, modelmatrix_cam, cammatrix)
         }
     }
     
     let dim = glfw.getFramebufferSize(this.window)
     let aspect = dim[0]/dim[1]
-    let fov = 1
-    let y = 0 //camera_height
-    mat4.frustum(projmatrix, 
-        -aspect*near*fov, aspect*near*fov, 
-        near*(y-fov), near*(y+fov), 
+
+    mat4.ortho(projmatrix, 
+        // x axis centered on screen:
+        -aspect*ortho_height_m/2, aspect*ortho_height_m/2, 
+        // y axis up from bottom of screen:
+        0, ortho_height_m, 
         near, far)
-    //mat4.perspective(projmatrix, Math.PI * 0.5, dim[0] / dim[1], near, far)
-    //if (options.run) camera_rotation += dt;
-    let at = [0, y+1, -camera_distance]
-    let eye = [at[0] + Math.sin(camera_rotation), at[1], at[2] + Math.cos(camera_rotation)]
-    mat4.lookAt(viewmatrix, eye, at, [0, 1, 0])
+    // view matrix looking out of screen
+    mat4.identity(viewmatrix)
     
 
     gl.viewport(0, 0, dim[0], dim[1]);
 	gl.clearColor(0, 0, 0, 1);
 	gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 
-    gl.enable(gl.BLEND);
-	gl.blendFunc(gl.SRC_ALPHA, gl.ONE);
-	gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
-    //gl.blendEquation(gl.FUNC_ADD)
-    gl.blendEquation(gl.MAX)
+    // gl.enable(gl.BLEND);
+	// gl.blendFunc(gl.SRC_ALPHA, gl.ONE);
+	// gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+    // //gl.blendEquation(gl.FUNC_ADD)
+    // gl.blendEquation(gl.MAX)
 
-    gl.disable(gl.DEPTH_TEST)
-    gl.depthMask(false)
+    // gl.disable(gl.DEPTH_TEST)
+    // gl.depthMask(false)
 
-    if (0) {
-        shaderman.shaders.normals.begin()
-        .uniform("u_tex_normals", 0)
-        .uniform("u_tex_cloud", 1)
-        quad_vao.bind().draw()
-    } else {
-        shaderman.shaders.points.begin()
-        .uniform("u_modelmatrix", modelmatrix_cam)
-        .uniform("u_viewmatrix", viewmatrix)
-        .uniform("u_projmatrix", projmatrix)
-        .uniform("u_pointsize", dim[0]/200)
-        .uniform("u_showmode", options.tex ? 1 : 0)
-        points_vao.bind().submit().drawPoints()
-    }
+    shaderman.shaders.points_depth.begin()
+    .uniform("u_modelmatrix", modelmatrix_cam)
+    .uniform("u_viewmatrix", viewmatrix)
+    .uniform("u_projmatrix", projmatrix)
+    .uniform("u_near", near)
+    .uniform("u_far", far)
+    .uniform("u_pointsize", dim[0] * 0.005)
+    points_vao.bind().submit().drawPoints()
+    
 
     gl.disable(gl.BLEND);
     gl.enable(gl.DEPTH_TEST)
