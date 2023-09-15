@@ -47,8 +47,7 @@ let window = new Window({
 })
 
 const shaderman = new Shaderman(gl)
-shaderman.create(gl, "normals")
-shaderman.create(gl, "points")
+shaderman.create(gl, "show")
 shaderman.create(gl, "points_depth")
 
 const quad_vao = glutils.createVao(gl, glutils.makeQuad())
@@ -61,6 +60,10 @@ const cloudtex = glutils.createTexture(gl, {
 const normaltex = glutils.createTexture(gl, { 
     float: true, channels: 4, width: cam.width, height: cam.height
 })
+
+const flat_fbo = glutils.makeGbuffer(gl, cam.width, cam.height, [
+    {}
+]);
 
 const points_vao = glutils.createVao(gl, {
     vertexComponents: 4,
@@ -111,18 +114,8 @@ let modelmatrix_cam = mat4.create();
 window.draw = function() {
 	let { t, dt } = this;
 
-    // const { width, height, cloud, normals } = cam
-	// let c = Math.floor(width/2)
-	// let r = Math.floor(height/2)
-	// info(c, r)
-
-    //camera_rotation = t
-
-
 	let viewmatrix = mat4.create();
 	let projmatrix = mat4.create();
-	let modelmatrix = mat4.create();
-
 
     if (cam.isOpened()) {
         // runtime config
@@ -173,46 +166,44 @@ window.draw = function() {
         }
     }
     
-    let dim = glfw.getFramebufferSize(this.window)
-    let aspect = dim[0]/dim[1]
 
-    mat4.ortho(projmatrix, 
-        // x axis centered on screen:
-        -aspect*ortho_height_m/2, aspect*ortho_height_m/2, 
-        // y axis up from bottom of screen:
-        0, ortho_height_m, 
-        near, far)
-    // view matrix looking out of screen
-    mat4.identity(viewmatrix)
+    flat_fbo.begin() 
+    {
+        let dim = [flat_fbo.width, flat_fbo.height]
+        let aspect = dim[0]/dim[1]
+        mat4.ortho(projmatrix, 
+            // x axis centered on screen:
+            -aspect*ortho_height_m/2, aspect*ortho_height_m/2, 
+            // y axis up from bottom of screen:
+            0, ortho_height_m, 
+            near, far)
+        // view matrix looking out of screen
+        mat4.identity(viewmatrix)
+
+        gl.viewport(0, 0, dim[0], dim[1]);
+        gl.clearColor(0, 0, 0, 1);
+        gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+
+        shaderman.shaders.points_depth.begin()
+        .uniform("u_modelmatrix", modelmatrix_cam)
+        .uniform("u_viewmatrix", viewmatrix)
+        .uniform("u_projmatrix", projmatrix)
+        .uniform("u_near", near)
+        .uniform("u_far", far)
+        .uniform("u_pointsize", dim[0] * 0.005)
+        points_vao.bind().submit().drawPoints()
+    }
+    flat_fbo.end()
     
-
+    let dim = glfw.getFramebufferSize(this.window)
     gl.viewport(0, 0, dim[0], dim[1]);
 	gl.clearColor(0, 0, 0, 1);
 	gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 
-    // gl.enable(gl.BLEND);
-	// gl.blendFunc(gl.SRC_ALPHA, gl.ONE);
-	// gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
-    // //gl.blendEquation(gl.FUNC_ADD)
-    // gl.blendEquation(gl.MAX)
-
-    // gl.disable(gl.DEPTH_TEST)
-    // gl.depthMask(false)
-
-    shaderman.shaders.points_depth.begin()
-    .uniform("u_modelmatrix", modelmatrix_cam)
-    .uniform("u_viewmatrix", viewmatrix)
-    .uniform("u_projmatrix", projmatrix)
-    .uniform("u_near", near)
-    .uniform("u_far", far)
-    .uniform("u_pointsize", dim[0] * 0.005)
-    points_vao.bind().submit().drawPoints()
+    flat_fbo.bind()
+    shaderman.shaders.show.begin()
+    quad_vao.bind().draw()
     
-
-    gl.disable(gl.BLEND);
-    gl.enable(gl.DEPTH_TEST)
-    gl.depthMask(true)
-    //console.log(1/dt)
 }
 
 const mouse = {
